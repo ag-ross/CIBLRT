@@ -58,7 +58,7 @@ Details are provided in the LICENSE file.
 
 ### Cite as:
 
-Ross, A. G. & Gershenzon, J. & Kleefeld, A. (2026). Beyond Consistent Scenarios: Deriving Indirect Influence, Transition Resistance, and Adjustment Dynamics. 
+Ross, A. G. & Gershenzon, J. & Kleefeld, A. (2026). Beyond Consistent Scenarios: Deriving Indirect Influence, Transition Resistance, and Adjustment Dynamics. arXiv. https://arxiv.org/abs/2607.12414 https://doi.org/10.48550/arXiv.2607.12414
 
 ## References
 
