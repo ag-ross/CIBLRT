@@ -13,21 +13,32 @@ WHAT THIS EXAMPLE DOES
 It takes a hardcoded Cross-Impact Matrix (CIM) (an energy-transition study
 with 10 descriptors and 3 states each) finds the consistent scenarios
 (structural equilibria), then asks a simple question at the high-ambition
-attractor (high policy stringency, fast renewables, low fossil prices):
+attractor (high policy stringency, fast renewables, low fossil prices).
+The setting FORM selects one of two questions:
 
-    "If Policy Stringency receives a single unit push, how does that signal
-     propagate through the cross-impact network, and which descriptors respond
-     most strongly, in which direction, and in what sequence?"
+    FORM = "backward" (the default, and the form reported in the paper):
+    "If each other descriptor in turn receives a single unit push, which
+     pushes move Policy Stringency most strongly, in which direction, and in
+     what sequence?"
 
-The answer is the Impulse Response Function (IRF): a curve for each descriptor
-showing its activation pressure over time after the shock.
+    FORM = "forward":
+    "If Policy Stringency receives a single unit push, which other
+     descriptors does it move most strongly, in which direction, and in
+     what sequence?"
+
+The answer is the Impulse Response Function (IRF): a curve for each other
+descriptor.  In the backward form (the sensitivity profile) the curve shows
+the activation pressure on Policy Stringency over time after a unit push on
+that descriptor.  In the forward form (the forward profile) it shows the
+activation pressure on that descriptor over time after a unit push on Policy
+Stringency.
 
 HOW TO USE AS A TEMPLATE
 -------------------------
 To adapt this to your own CIB study, replace the DESCRIPTORS and IMPACTS
 dictionaries with your own CIM data.  Then change SHOCK_DESCRIPTOR to
-whichever driver you want to push, and adjust ATTRACTOR_PROFILE to point
-to the scenario of interest.
+whichever descriptor you want to profile, set FORM to the question you want
+answered, and adjust ATTRACTOR_PROFILE to point to the scenario of interest.
 
 DEPENDENCIES
 ------------
@@ -46,6 +57,7 @@ OUTPUT
 from __future__ import annotations
 
 import sys
+import textwrap
 import warnings
 from pathlib import Path
 
@@ -362,11 +374,18 @@ IMPACTS: dict[tuple[str, str, str, str], int] = {
 # ===========================================================================
 # SECTION 2: ANALYSIS SETTINGS
 #
-# Change SHOCK_DESCRIPTOR to shock a different driver.
+# Change FORM to switch between the two readings of the network:
+#   "backward"  response of SHOCK_DESCRIPTOR to a unit push on each other
+#               descriptor (sensitivity profile, the form reported in the paper)
+#   "forward"   response of each other descriptor to a unit push on
+#               SHOCK_DESCRIPTOR (forward profile)
+# Change SHOCK_DESCRIPTOR to profile a different descriptor.
 # Change ATTRACTOR_PROFILE to target a different scenario.
 # ===========================================================================
 
-# The descriptor whose unit impulse we want to trace through the network.
+FORM = "backward"
+
+# The profiled descriptor: the responding one (backward) or the pushed one (forward).
 SHOCK_DESCRIPTOR = "Policy_Stringency"
 
 # The attractor (consistent scenario) at which the shock is evaluated.
@@ -429,8 +448,46 @@ SUMMARY_FILE   = _HERE / "output_policy_shock_summary.txt"
 # ===========================================================================
 # SECTION 3: SETTINGS VALIDATION
 #
-# Catch configuration errors before any computation begins.
+# Fix the orientation (M^T backward, M forward) and the wording that FORM
+# selects, then catch configuration errors before any computation begins.
 # ===========================================================================
+
+_FORMS = {
+    "backward": {
+        "orient":    lambda A: A.T,
+        "title":     "Sensitivity profile",
+        "impulse":   "response to a +1 unit impulse on each other descriptor",
+        "summary":   f"response of '{SHOCK_DESCRIPTOR}' to a +1 unit impulse on each other descriptor",
+        "push":      f"A unit push on this descriptor pressures '{SHOCK_DESCRIPTOR}'",
+        "unreached": f"A unit push on this descriptor does not reach '{SHOCK_DESCRIPTOR}'",
+        "uncertain": "the response to a push on them",
+        "R":         "R",
+        "ylabel":    "Activation pressure  R(τ)",
+        "Lambda":    "Lambda",
+        "inverse":   "(I - W)^{-T}",
+    },
+    "forward": {
+        "orient":    lambda A: A,
+        "title":     "Forward profile",
+        "impulse":   f"response of each other descriptor to a +1 unit impulse on '{SHOCK_DESCRIPTOR}'",
+        "summary":   f"response of each other descriptor to a +1 unit impulse on '{SHOCK_DESCRIPTOR}'",
+        "push":      f"A unit push on '{SHOCK_DESCRIPTOR}' pressures this descriptor",
+        "unreached": f"A unit push on '{SHOCK_DESCRIPTOR}' does not reach this descriptor",
+        "uncertain": f"their response to a push on '{SHOCK_DESCRIPTOR}'",
+        "R":         "R^F",
+        "ylabel":    "Activation pressure  $\\mathregular{R^F}$(τ)",
+        "Lambda":    "Lambda^F",
+        "inverse":   "(I - W)^{-1}",
+    },
+}
+
+if FORM not in _FORMS:
+    raise ValueError(
+        f"FORM = {FORM!r} is invalid.  "
+        "It must be 'backward' or 'forward'.  "
+        "Check SECTION 2: ANALYSIS SETTINGS."
+    )
+_F = _FORMS[FORM]
 
 if not (0.0 < IO3_TARGET_RHO < 1.0):
     raise ValueError(
@@ -486,8 +543,13 @@ for (src_d, src_s, tgt_d, tgt_s), score in IMPACTS.items():
     matrix.set_impact(src_d, src_s, tgt_d, tgt_s, score)
 
 print(f"\nDescriptors : {matrix.n_descriptors}")
-print(f"States each : 3")
-print(f"Scenario space: 3^{matrix.n_descriptors} = {3**matrix.n_descriptors:,} candidates")
+n_states = [len(states) for states in DESCRIPTORS.values()]
+if len(set(n_states)) == 1:
+    print(f"States each : {n_states[0]}")
+    print(f"Scenario space: {n_states[0]}^{matrix.n_descriptors} = {n_states[0]**matrix.n_descriptors:,} candidates")
+else:
+    print(f"States each : {n_states}")
+    print(f"Scenario space: {int(np.prod(n_states)):,} candidates")
 
 # Find all consistent scenarios.  For a 10-descriptor × 3-state matrix this
 # completes in well under a second.
@@ -500,10 +562,9 @@ scenarios = search.scenarios
 print(f"Found {len(scenarios)} consistent scenarios:")
 for i, sc in enumerate(scenarios, 1):
     tag = f"  sc{i:02d}"
-    policy = sc.to_dict().get("Policy_Stringency", "?")
-    renew  = sc.to_dict().get("Renewables_Deployment", "?")
-    fossil = sc.to_dict().get("Fossil_Price_Level", "?")
-    print(f"{tag}  Policy={policy:<8}  Renewables={renew:<10}  Fossil price={fossil}")
+    states = sc.to_dict()
+    fields = "  ".join(f"{d}={states.get(d, '?'):<10}" for d in ATTRACTOR_PROFILE)
+    print(f"{tag}  {fields}".rstrip())
 
 
 # ===========================================================================
@@ -624,17 +685,21 @@ print(f"Slowest relaxation timescale ≈ {timescale:.1f} model units")
 # ===========================================================================
 # SECTION 8: UNIT-IMPULSE SHOCK ANALYSIS
 #
-# The unit impulse ε = e_i is a vector of zeros with a 1 in position i
-# (the shocked descriptor).  The impulse response R(τ) = exp(M^T τ) ε
-# traces how that initial unit push propagates through the cross-impact
-# network over time τ:
+# The unit vector ε = e_i is a vector of zeros with a 1 in position i
+# (the profiled descriptor).  FORM selects the impulse response:
 #
-#   R_j(τ) = activation pressure on descriptor j at time τ
+#   backward  R(τ) = exp(M^T τ) ε, row i of exp(M τ), the response of
+#             descriptor i to a unit push on each other descriptor:
+#             R_j(τ) = activation pressure on descriptor i at time τ from a unit push on j
+#   forward   R^F(τ) = exp(M τ) ε, column i of exp(M τ), the response of
+#             each other descriptor to a unit push on descriptor i:
+#             R^F_j(τ) = activation pressure on descriptor j at time τ from a unit push on i
 #
-# Positive R_j(τ): the network is pushing descriptor j toward a higher
-#                  ordinal state (upward pressure).
-# Negative R_j(τ): the network is pushing descriptor j toward a lower
-#                  ordinal state (downward pressure).
+# Below, R_j(τ) also denotes R^F_j(τ) in the forward form.
+# Positive R_j(τ): the push moves the responding descriptor (i backward,
+#                  j forward) toward a higher ordinal state (upward pressure).
+# Negative R_j(τ): the push moves the responding descriptor toward a
+#                  lower ordinal state (downward pressure).
 #
 # All pressures decay to zero as the system absorbs the shock → provided
 # the network is stable (ensured by IO-3 rescaling above).
@@ -642,38 +707,44 @@ print(f"Slowest relaxation timescale ≈ {timescale:.1f} model units")
 
 shock_idx         = desc_names.index(SHOCK_DESCRIPTOR)
 epsilon           = np.zeros(N)
-epsilon[shock_idx] = 1.0   # unit push on the shocked descriptor
+epsilon[shock_idx] = 1.0   # unit weight selects the profiled descriptor
 
 # Choose the time horizon: five slowest timescales, or at least 20 units.
 tau_max = TAU_MAX if TAU_MAX is not None else max(5.0 * timescale, 20.0)
 taus    = np.arange(0.0, tau_max + DT / 2.0, DT)
 
 # Compute the response curves by repeated application of the matrix
-# exponential step exp(M^T Δt).  This is the semigroup property:
-# R(τ + Δt) = exp(M^T Δt) · R(τ).
+# exponential step exp(K Δt), with K = M^T (backward) or M (forward).
+# This is the semigroup property: R(τ + Δt) = exp(K Δt) · R(τ).
 # .real: scipy returns real output for real input; the numpy fallback used
 # when scipy is absent may return complex with negligible imaginary residual.
-exp_step = expm(M_sc.T * DT).real
+exp_step = expm(_F["orient"](M_sc) * DT).real
 curves   = np.zeros((len(taus), N))
 curves[0] = epsilon
 for k in range(1, len(taus)):
     curves[k] = exp_step @ curves[k - 1]
 
-print(f"\nShock: +1 unit impulse on '{SHOCK_DESCRIPTOR}'")
+print(f"\n{_F['title']} of '{SHOCK_DESCRIPTOR}': {_F['impulse']}")
 print(f"Time horizon τ_max = {tau_max:.1f} model units  (Δt = {DT})")
 
 
 # ===========================================================================
 # SECTION 9: RESULTS: RANKED DESCRIPTOR RESPONSES
 #
-# For each non-shocked descriptor, we report:
-#   - Peak |R(τ)|: how strongly it responds (absolute value of maximum)
-#   - Direction:   positive (upward pressure) or negative (downward pressure)
-#                  at the moment of peak response
-#   - τ at peak:   how quickly the response peaks
+# For each other descriptor j, we report:
+#   - Peak |R_j(τ)|: how strongly the responding descriptor (the profiled
+#                    descriptor backward, j forward) responds to the unit push,
+#                    as the maximum of |R_j(τ)| over τ
+#   - Direction:     positive (upward pressure) or negative (downward pressure)
+#                    on the responding descriptor at the moment of peak
+#                    response, or none if the curve is identically zero
+#   - τ at peak:     how quickly the response peaks
 # ===========================================================================
 
-print(f"\n{'Rank':<5} {'Descriptor':<30} {'Peak |R|':<12} "
+_ZERO_TOL = 1.0e-12
+peak_hdr  = f"Peak |{_F['R']}|"
+
+print(f"\n{'Rank':<5} {'Descriptor':<30} {peak_hdr:<12} "
       f"{'Direction':<12} {'τ at peak':<10}")
 print("  " + "-" * 68)
 
@@ -684,73 +755,84 @@ ranked = sorted(
     reverse=True,
 )
 
+unreached = [i for i in other_idx if np.max(np.abs(curves[:, i])) < _ZERO_TOL]
+
 for rank, i in enumerate(ranked, 1):
     peak_val  = float(curves[np.argmax(np.abs(curves[:, i])), i])
     peak_abs  = abs(peak_val)
-    direction = "positive ↑" if peak_val > 0 else "negative ↓"
+    direction = "none" if i in unreached else "positive ↑" if peak_val > 0 else "negative ↓"
     tau_pk    = float(taus[np.argmax(np.abs(curves[:, i]))])
-    print(f"  {rank:<4} {desc_names[i]:<30} {peak_abs:<12.4f} "
-          f"{direction:<12} {tau_pk:<10.2f}")
+    tau_txt   = f"{'-':<10}" if i in unreached else f"{tau_pk:<10.2f}"
+    pk_txt    = f"{'-':<12}" if i in unreached else f"{peak_abs:<12.4f}"
+    print(f"  {rank:<4} {desc_names[i]:<30} {pk_txt} "
+          f"{direction:<12} {tau_txt}")
 
 print()
 print("Interpretation guide:")
-print("  positive ↑  The shock propagates through the network in a way that")
-print("              reinforces this descriptor's current (attractor) state.")
-print("  negative ↓  The shock propagates in a way that pressures this")
-print("              descriptor toward a lower ordinal state.")
+print(f"  positive ↑  {_F['push']}")
+print("              toward a higher ordinal state (upward pressure).")
+print(f"  negative ↓  {_F['push']}")
+print("              toward a lower ordinal state (downward pressure).")
+if unreached:
+    print(f"  none        {_F['unreached']}")
+    print("              in the elicited network at this attractor (the curve is identically zero).")
 print()
 print("Note: responses reflect ALL direct and indirect network paths,")
 print("not just the immediate cross-impact scores.  Counterintuitive")
 print("directions reveal indirect feedback loops in the CIM structure.")
 print()
 print("IMPORTANT: the τ axis is dimensionless model time, not calendar")
-print("time.  The ordering of responses (which descriptor peaks first)")
-print("is a robust structural property.  Do NOT attach calendar dates")
-print("to these curves without independent empirical calibration.")
+print("time.  The late-time ordering of responses is a structural property")
+print("of the network.  The early-peak order also depends on the rescaling")
+print("target.  Do NOT attach calendar dates to these curves without")
+print("independent empirical calibration.")
 
 
 # ===========================================================================
 # SECTION 10: TYPE I CROSS-IMPACT MULTIPLIER
 #
 # The Type I cross-impact multiplier Lambda = -M^{-T} = (I - W)^{-T}
+# (backward) or Lambda^F = -M^{-1} = (I - W)^{-1} = Lambda^T (forward)
 # aggregates all direct and indirect influence chains through the network
 # into a single matrix.  It is the CIB analogue of the Leontief inverse
 # in input-output economics.
 #
-# The diagonal entry Lambda_jj gives the total cumulative activation that
-# descriptor j accumulates from sustained pressure on itself, propagated
-# through all indirect feedback chains.  A NEGATIVE diagonal entry is a
-# structural warning: the indirect feedback ultimately reverses the direction
-# of the descriptor's own response.  This is why some shock-response curves
-# change sign during the horizon -- the reversal is a property of the network,
-# not noise.  (See paper Section 2.5 and Supplementary Table S2.)
+# The diagonal entry Lambda_jj, identical in both forms, gives the total
+# cumulative activation that descriptor j accumulates from sustained pressure
+# on itself, propagated through all indirect feedback chains.  A NEGATIVE
+# diagonal entry is a structural warning: the indirect feedback ultimately
+# reverses the direction of the descriptor's own response.  It does not
+# predict sign changes in the curves above, which are off-diagonal responses
+# between the profiled descriptor and the others.  (See paper Section 2.6 and
+# Supplementary Table S2.)
 # ===========================================================================
 
 print("\n" + "=" * 60)
-print("Type I Cross-Impact Multiplier  Lambda = -(I - W)^{-T}")
+print(f"Type I Cross-Impact Multiplier  {_F['Lambda']} = {_F['inverse']}")
 print("=" * 60)
 
 lambda_diag = None   # set here; used again in Section 13 export
+lambda_hdr  = f"diag({_F['Lambda']})"
 try:
-    Lambda      = -np.linalg.inv(M_sc).T   # Lambda = -M^{-T}
+    Lambda      = _F["orient"](-np.linalg.inv(M_sc))   # -M^{-T} backward, -M^{-1} forward
     lambda_diag = np.diag(Lambda)
 
-    print(f"\n{'Descriptor':<30} {'diag(Lambda)':<18} {'Note'}")
+    print(f"\n{'Descriptor':<30} {lambda_hdr:<18} {'Note'}")
     print("  " + "-" * 68)
     for j, name in enumerate(desc_names):
         val  = lambda_diag[j]
-        note = "negative: sign reversal expected" if val < 0 else ""
+        note = "negative: cumulative self-response reverses sign" if val < 0 else ""
         print(f"  {name:<30} {val:<18.4f} {note}")
 
     n_negative = int(np.sum(lambda_diag < 0))
     print()
     if n_negative > 0:
         print(f"  {n_negative} descriptor(s) have negative diagonal entries.")
-        print("  Their shock-response curves may cross zero before settling.")
-        print("  This is a structural property of the network at this attractor,")
-        print("  not an artefact of the rescaling or noise level.")
+        print("  Their cumulative self-response reverses sign before settling.")
+        print("  This is a structural property of the network at this attractor")
+        print("  and rescaling target, not an artefact of the noise level.")
     else:
-        print("  All diagonal entries are positive: no sign reversals expected.")
+        print("  All diagonal entries are positive: no cumulative self-response reverses sign.")
 
 except np.linalg.LinAlgError:
     print("  WARNING: M is singular. Type I multiplier could not be computed.")
@@ -767,7 +849,7 @@ print()
 # differently, quantifying the robustness of the structural result.
 #
 # The unit-impulse vector ε is kept fixed across all realisations: only
-# the network (W) varies, not the shock itself.
+# the network (W) varies, not the profiled descriptor.
 # ===========================================================================
 
 print(f"\nRunning {N_MC}-sample Monte Carlo ribbon "
@@ -796,7 +878,7 @@ for _ in range(N_MC):
         continue
 
     # Compute the IRF at the coarser MC time step.
-    exp_mc = expm(M_n_sc.T * DT_MC).real  # see note on exp_step above
+    exp_mc = expm(_F["orient"](M_n_sc) * DT_MC).real  # see note on exp_step above
     c      = np.zeros((T_mc, N))
     c[0]   = epsilon
     for k in range(1, T_mc):
@@ -831,31 +913,35 @@ mc_arr  = np.array(mc_curves)
 mc_lo   = np.percentile(mc_arr, CI_LO, axis=0)   # shape (T_mc, N)
 mc_hi   = np.percentile(mc_arr, CI_HI, axis=0)
 
-# Warn if any descriptor's uncertainty band straddles zero at its peak,
-# meaning the direction of response is genuinely uncertain at this noise level.
+# Warn if the band interpolated at the deterministic peak time straddles zero.
 uncertain_dirs = []
-for i in range(N):
-    if i == shock_idx:
-        continue
-    # Check whether the band crosses zero at any time point.
-    if np.any(mc_lo[:, i] < 0) and np.any(mc_hi[:, i] > 0):
+for i in other_idx:
+    if i in unreached:
+        continue   # an identically zero curve has no peak
+    tau_pk = taus[np.argmax(np.abs(curves[:, i]))]
+    if np.interp(tau_pk, taus_mc, mc_lo[:, i]) < 0 < np.interp(tau_pk, taus_mc, mc_hi[:, i]):
         uncertain_dirs.append(desc_names[i])
 
 if uncertain_dirs:
     print()
-    print("WARNING: the following descriptor(s) have MC bands that straddle zero,")
-    print("meaning their direction of response is uncertain at the elicitation")
+    print("WARNING: the following descriptor(s) have MC bands that straddle zero at the peaks of their curves,")
+    print(f"meaning the direction of {_F['uncertain']} is uncertain at the elicitation")
     print("noise level used.  Do not report their direction as a firm conclusion:")
     for d in uncertain_dirs:
         print(f"  • {d}")
+    if unreached:
+        print("Curves with direction none have no peak and are not tested.")
 
 
 # ===========================================================================
 # SECTION 12: PLOT
 #
-# Each coloured line is one descriptor's activation pressure R_j(τ) over
-# time.  All curves start from the initial push and decay to zero as the
-# network absorbs the shock.
+# Each coloured line is the activation pressure R_j(τ) over time on the
+# profiled descriptor from a unit push on descriptor j (backward), or on
+# descriptor j from a unit push on the profiled descriptor (forward).  All
+# curves start at zero, peak, and decay to zero as the network absorbs the
+# push, except that a curve whose push never reaches the responding
+# descriptor stays at zero.
 # ===========================================================================
 
 cmap   = matplotlib.colormaps["tab10"]
@@ -865,7 +951,7 @@ fig, ax = plt.subplots(figsize=(8, 4.5))
 
 for i in range(N):
     if i == shock_idx:
-        continue   # the shocked descriptor itself is not plotted
+        continue   # the self-response of the profiled descriptor is not plotted
     col   = colors[i]
     label = desc_names[i].replace("_", " ")
 
@@ -879,12 +965,11 @@ for i in range(N):
 
 ax.axhline(0, color="0.6", lw=0.6, ls="--")
 ax.set_xlabel("Model time τ (dimensionless)", fontsize=10)
-ax.set_ylabel("Activation pressure  R(τ)", fontsize=10)
+ax.set_ylabel(_F["ylabel"], fontsize=10)
+attractor_label = textwrap.fill(", ".join(f"{d.replace('_', ' ')}={sc_dict[d]}" for d in ATTRACTOR_PROFILE), 100)
 ax.set_title(
-    f"Unit-impulse shock on '{SHOCK_DESCRIPTOR.replace('_', ' ')}'\n"
-    f"at attractor: Policy={sc_dict['Policy_Stringency']}, "
-    f"Renewables={sc_dict['Renewables_Deployment']}, "
-    f"Fossil price={sc_dict['Fossil_Price_Level']}  "
+    f"{_F['title']} of '{SHOCK_DESCRIPTOR.replace('_', ' ')}'\n"
+    f"at attractor: {attractor_label}\n"
     f"[shaded: {CI_LO}–{CI_HI}th pct, N={n_accepted} MC draws, σ={MC_SIGMA}]",
     fontsize=8,
 )
@@ -928,7 +1013,7 @@ if SUMMARY_FILE is not None:
         _w()
         _w("RUN PARAMETERS")
         _w("-" * 40)
-        _w(f"  Shocked descriptor     : {SHOCK_DESCRIPTOR}")
+        _w(f"  Profiled descriptor    : {SHOCK_DESCRIPTOR}")
         _w(f"  IO-3 target rho        : {IO3_TARGET_RHO}")
         _w(f"  Raw spectral radius    : {rho_raw:.3f}")
         _w(f"  Rescaling factor alpha : {alpha:.4f}")
@@ -949,29 +1034,31 @@ if SUMMARY_FILE is not None:
 
         _w()
         _w("RANKED DESCRIPTOR RESPONSES")
-        _w("(shock: +1 unit impulse on '{}')".format(SHOCK_DESCRIPTOR))
+        _w(f"({_F['summary']})")
         _w("-" * 68)
-        _w(f"  {'Rank':<5} {'Descriptor':<30} {'Peak |R|':<12} "
+        _w(f"  {'Rank':<5} {'Descriptor':<30} {peak_hdr:<12} "
            f"{'Direction':<14} {'t at peak':<10}")
         _w("  " + "-" * 64)
         for rank, i in enumerate(ranked, 1):
             peak_val  = float(curves[np.argmax(np.abs(curves[:, i])), i])
             peak_abs  = abs(peak_val)
-            direction = "positive" if peak_val > 0 else "negative"
+            direction = "none" if i in unreached else "positive" if peak_val > 0 else "negative"
             tau_pk    = float(taus[np.argmax(np.abs(curves[:, i]))])
-            _w(f"  {rank:<5} {desc_names[i]:<30} {peak_abs:<12.4f} "
-               f"{direction:<14} {tau_pk:<10.2f}")
+            tau_txt   = f"{'-':<10}" if i in unreached else f"{tau_pk:<10.2f}"
+            pk_txt    = f"{'-':<12}" if i in unreached else f"{peak_abs:<12.4f}"
+            _w(f"  {rank:<5} {desc_names[i]:<30} {pk_txt} "
+               f"{direction:<14} {tau_txt}")
 
         _w()
-        _w("TYPE I CROSS-IMPACT MULTIPLIER  diag(Lambda)")
-        _w("Lambda = -(I - W)^{-T};  negative diagonal = sign reversal expected")
+        _w(f"TYPE I CROSS-IMPACT MULTIPLIER  {lambda_hdr}")
+        _w(f"{_F['Lambda']} = {_F['inverse']};  negative diagonal = cumulative self-response reverses sign")
         _w("-" * 68)
-        _w(f"  {'Descriptor':<30} {'diag(Lambda)':<18} Note")
+        _w(f"  {'Descriptor':<30} {lambda_hdr:<18} Note")
         _w("  " + "-" * 64)
         if lambda_diag is not None:
             for j, name in enumerate(desc_names):
                 val  = float(lambda_diag[j])
-                note = "sign reversal expected" if val < 0 else ""
+                note = "cumulative self-response reverses sign" if val < 0 else ""
                 _w(f"  {name:<30} {val:<18.4f} {note}")
         else:
             _w("  (could not compute: M is singular)")
@@ -980,18 +1067,25 @@ if SUMMARY_FILE is not None:
             _w()
             _w("MC WARNING: uncertain response direction")
             _w("-" * 40)
-            _w("  The following descriptors have MC bands that straddle zero.")
-            _w("  Their direction of response should not be reported as a firm conclusion:")
+            _w("  The following descriptors have MC bands that straddle zero at the peaks of their curves.")
+            _w(f"  The direction of {_F['uncertain']} should not be reported as a firm conclusion:")
             for d in uncertain_dirs:
                 _w(f"    - {d}")
+            if unreached:
+                _w("  Curves with direction none have no peak and are not tested.")
+        elif len(unreached) == len(other_idx):
+            _w()
+            _w("MC: every curve has direction none, so no direction is tested.")
         else:
             _w()
-            _w("MC: all response directions are robust across the uncertainty band.")
+            _w("MC: no band straddles zero at the peak of its curve, so every tested direction is robust.")
+            if unreached:
+                _w("  Curves with direction none have no peak and are not tested.")
 
         _w()
         _w("NOTE: the t axis is dimensionless model time, not calendar time.")
-        _w("      Ordering of responses is a robust structural property.")
-        _w("      Absolute magnitudes depend on IO3_TARGET_RHO; do not compare")
+        _w("      Late-time ordering of responses is a structural property.")
+        _w("      Early-peak order and absolute magnitudes depend on IO3_TARGET_RHO; do not compare")
         _w("      across studies that used a different rescaling target.")
         _w()
         _w(f"Plot saved to : {OUTPUT_FILE.name if OUTPUT_FILE else '(interactive)'}")
