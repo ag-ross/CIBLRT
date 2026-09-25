@@ -1,9 +1,9 @@
 """shock_descriptor.py — unit-impulse shock analysis for a single descriptor.
 
-Applies a unit impulse ε̃ = ±eᵢ to one descriptor at one attractor and traces
-how all descriptors respond via the IRF R⁽ⁱ⁾(τ) = exp(Mᵀτ)eᵢ, analogous to
-Klimek (2019) Fig 1b.  Configuration (scenario, descriptor, sign) is at the
-top of the file.
+Applies a unit impulse ε̃ = ±eᵢ at one attractor and traces how descriptor i
+responds to a push on each other descriptor via the sensitivity profile
+R⁽ⁱ⁾(τ) = exp(Mᵀτ)eᵢ, analogous to Klimek (2019) Fig 1b.  Configuration
+(scenario, descriptor, sign) is at the top of the file.
 
 Requires outputs/cib_lrt_results.pkl from run_analysis.py.
 Output: outputs/"FIG_02.pdf"
@@ -237,7 +237,7 @@ def main() -> None:
 
     for j in range(N):
         if j == shock_idx:
-            continue   # omit the directly shocked descriptor
+            continue   # omit the self-response
 
         col   = COLORS[j]
         ls    = DESCRIPTOR_LINESTYLES[j % len(DESCRIPTOR_LINESTYLES)]
@@ -289,10 +289,10 @@ def main() -> None:
     peak_abs       = np.max(np.abs(curves_det[:, other_idx]), axis=0)
     sorted_order   = np.argsort(-peak_abs)
 
-    print(f"\nShock: {shock_sign_str}1 unit impulse on {SHOCKED_DESCRIPTOR}")
+    print(f"\nSensitivity profile of {SHOCKED_DESCRIPTOR} to a {shock_sign_str}1 unit impulse on each other descriptor")
     print(f"Scenario: {SCENARIO_TAG}   IO-3 α = {alpha:.4f}   τ_max = {tau_max:.1f}")
-    print(f"\nDescriptor responses ranked by peak |R(τ)| (excluding shocked):")
-    print(f"  {'Rank':<5} {'Descriptor':<35} {'Peak R(τ)':<12} {'τ at peak':<10}")
+    print(f"\nPushes ranked by peak |R(τ)| of {SHOCKED_DESCRIPTOR} (excluding self):")
+    print(f"  {'Rank':<5} {'Push on':<35} {'Peak R(τ)':<12} {'τ at peak':<10}")
     print("  " + "-" * 62)
     for rank, k in enumerate(sorted_order):
         di   = other_idx[k]
@@ -302,7 +302,7 @@ def main() -> None:
 
     self_peak = float(curves_det[np.argmax(np.abs(curves_det[:, shock_idx])), shock_idx])
     t_self    = float(taus_det[np.argmax(np.abs(curves_det[:, shock_idx]))])
-    print(f"\n  Shocked descriptor self-response:")
+    print(f"\n  Self-response:")
     print(f"  {SHOCKED_DESCRIPTOR:<35} {self_peak:<+12.4f} at τ = {t_self:.2f}")
     rej_parts = [f"{cnt} {cat}" for cat, cnt in mc_rejects.items() if cnt > 0]
     rej_str   = "" if not rej_parts else "  [" + "; ".join(rej_parts) + "]"

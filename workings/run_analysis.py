@@ -28,7 +28,7 @@ Output
 
 Dependencies
 ------------
-See workings/README.md.  PyCIB, numpy, and scipy are all required.
+PyCIB, numpy, and scipy are all required.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ except ImportError:
     if not _PYCIB.is_dir():
         raise ImportError(
             "PyCIB not found.  Install it from https://github.com/ag-ross/PyCIB "
-            "(see workings/README.md), or place the unpacked source at "
+            "or place the unpacked source at "
             f"{_PYCIB}."
         ) from None
     sys.path.insert(0, str(_PYCIB))
@@ -163,7 +163,7 @@ def _print_matrix_summary(
     entries.sort(key=lambda x: -x[0])
     print(f"  {name} -- top {top_k} off-diagonal entries by |magnitude|:")
     for _, val, row, col in entries[:top_k]:
-        print(f"    [{row[:28]:28s} <- {col[:28]:28s}]  {val:+.4f}")
+        print(f"    [{row[:28]:28s} -> {col[:28]:28s}]  {val:+.4f}")
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CIB-LRT analysis pipeline")
     parser.add_argument(
         "--force", action="store_true",
-        help="Ignore any existing cache and recompute from scratch",
+        help="Recompute LRT objects from the cached attractor set",
     )
     args = parser.parse_args()
 

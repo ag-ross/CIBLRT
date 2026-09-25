@@ -41,7 +41,7 @@ except ImportError:
     if not _PYCIB.is_dir():
         raise ImportError(
             "PyCIB not found.  Install it from https://github.com/ag-ross/PyCIB "
-            "(see workings/README.md), or place the unpacked source at "
+            "or place the unpacked source at "
             f"{_PYCIB}."
         ) from None
     sys.path.insert(0, str(_PYCIB))
@@ -479,7 +479,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 1 — per-descriptor IRF with Monte Carlo CI ribbon (sc05 → sc03)
     # -----------------------------------------------------------------------
-    print(f"\n[Fig 1] IRF sc05→sc03 single-panel with {N_MC}-sample Monte Carlo CI ribbon ...")
+    print(f"\n[FIG_01] IRF sc05→sc03 single-panel with {N_MC}-sample Monte Carlo CI ribbon ...")
 
     def _find_scenario(data, **state_requirements) -> dict:
         """Return the first stable_data entry whose scenario matches all state requirements."""
@@ -651,7 +651,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 2 — ‖R(τ)‖₂ norm ensemble across all directed scenario pairs
     # -----------------------------------------------------------------------
-    print("\n[Fig 2] IRF norm ensemble across all directed scenario pairs ...")
+    print("\n[FIG_03] IRF norm ensemble across all directed scenario pairs ...")
 
     fig2, ax2 = plt.subplots()
     pair_idx   = 0
@@ -715,7 +715,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 3 — susceptibility network graph (sc01), t₁ = 1 and t₁ = 5
     # -----------------------------------------------------------------------
-    print("\n[Fig 3] Susceptibility network graphs for sc01 (t₁ = 1 and t₁ = 5) ...")
+    print("\n[FIG_04] Susceptibility network graphs for sc01 (t₁ = 1 and t₁ = 5) ...")
 
     M_sc01 = stable_by_tag["sc01"]["M"]
     rho1   = susceptibility_matrix(M_sc01, 1.0)
@@ -831,7 +831,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 4 — IO-3 target-ρ sensitivity analysis (2 × 2 panel)
     # -----------------------------------------------------------------------
-    print("\n[Fig 4] IO-3 target-ρ sensitivity analysis ...")
+    print("\n[FIG_S1] IO-3 target-ρ sensitivity analysis ...")
 
     dz_01_02 = delta_z_from_scenarios(
         desc_names, STATE_ORDER_BY_DESCRIPTOR,
@@ -942,7 +942,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 5 + CSV 2 — calibration-horizon sweep  t₁ ∈ [0.5, 10.0]
     # -----------------------------------------------------------------------
-    print(f"\n[Fig 5] Calibration-horizon sweep  t₁ ∈ [{T1_SWEEP[0]}, {T1_SWEEP[-1]}] "
+    print(f"\n[FIG_S2] Calibration-horizon sweep  t₁ ∈ [{T1_SWEEP[0]}, {T1_SWEEP[-1]}] "
           f"({len(T1_SWEEP)} points) ...")
 
     sweep_budgets  = np.zeros((len(T1_SWEEP), n_sc, n_sc))
@@ -1062,7 +1062,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Fig 6 + CSV 3 — MC_SIGMA sweep (noise-scale robustness)
     # -----------------------------------------------------------------------
-    print(f"\n[Fig 6] MC_SIGMA sweep  σ ∈ [{MC_SIGMA_SWEEP[0]}, {MC_SIGMA_SWEEP[-1]}] "
+    print(f"\n[FIG_S3] MC_SIGMA sweep  σ ∈ [{MC_SIGMA_SWEEP[0]}, {MC_SIGMA_SWEEP[-1]}] "
           f"({len(MC_SIGMA_SWEEP)} values, {MC_SIGMA_N} samples each) ...")
 
     sd_sig_from = _find_scenario(stable_data,
