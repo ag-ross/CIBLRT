@@ -1,12 +1,12 @@
 # CIB-LRT: Beyond Consistent Scenarios: Deriving Indirect Influence, Transition Resistance, and Adjustment Dynamics
 
-Code for applying Linear Response Theory (LRT) to Cross-Impact Balance (CIB) analysis. The framework extends standard CIB beyond attractor enumeration, deriving four analytical objects in closed form from the cross-impact matrix: a cross-impact multiplier, a susceptibility matrix, an impulse response function (IRF), and a unit-impulse shock profile.
+Code for applying Linear Response Theory (LRT) to cross-impact balance (CIB) analysis. The framework extends standard CIB beyond attractor enumeration, deriving four analytical objects in closed form from the cross-impact matrix: a perturbation budget, a Type I cross-impact multiplier, an impulse response function (IRF), and a unit-impulse shock profile.
 
 ## Repository layout
 
 **`replicate.py`** — Single entry point that runs the full replication pipeline in one command.
 
-**`workings/`** — Full replication of the paper pipeline for the 15-descriptor energy-transition dataset (`Phase_D_CIM.csv`): attractor enumeration, all LRT objects, figures, and sensitivity analyses. See `workings/README.md`.
+**`workings/`** — Full replication of the paper pipeline for the 15-descriptor energy-transition dataset (`Phase_D_CIM.csv`): attractor enumeration, all LRT objects, figures, and sensitivity analyses.
 
 **`examples/`** — Standalone practitioner examples with hardcoded CIMs, requiring no external data files. See `examples/README.md`.
 
@@ -28,6 +28,7 @@ python run_analysis.py --force  # recompute, preserving the locked attractor set
 python plot_irf.py              # figures FIG_01, FIG_03, FIG_04, FIG_S1-S3
 python shock_descriptor.py      # unit-impulse shock figure FIG_02
 python export_tables.py         # paper tables as CSV
+python diagnostics.py           # paper diagnostics -> table_diagnostics.csv, mc_sign_robustness.csv, mc_peak_band.csv
 ```
 
 To run the self-contained practitioner example:
@@ -58,7 +59,7 @@ Details are provided in the LICENSE file.
 
 ### Cite as:
 
-Ross, A. G. & Gershenzon, J. & Kleefeld, A. (2026). Beyond Consistent Scenarios: Deriving Indirect Influence, Transition Resistance, and Adjustment Dynamics. arXiv. https://arxiv.org/abs/2607.12414 https://doi.org/10.48550/arXiv.2607.12414
+Ross, A. G., Gershenzon, J., & Kleefeld, A. (2026). Beyond Consistent Scenarios: Deriving Indirect Influence, Transition Resistance, and Adjustment Dynamics.
 
 ## References
 

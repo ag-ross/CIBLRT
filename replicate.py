@@ -1,13 +1,14 @@
 """
 replicate.py -- one-command replication of all CIB-LRT paper results.
 
-Runs the four workings/ pipeline scripts in dependency order and writes
+Runs the five workings/ pipeline scripts in dependency order and writes
 all outputs to workings/outputs/.
 
   Stage 1  run_analysis.py     -- attractor enumeration + LRT objects (cache)
   Stage 2  plot_irf.py         -- figures FIG_01, FIG_03, FIG_04, FIG_S1-S3
   Stage 3  shock_descriptor.py -- unit-impulse shock figure FIG_02
   Stage 4  export_tables.py    -- paper tables as CSV
+  Stage 5  diagnostics.py      -- paper diagnostics as CSV
 
 Usage
 -----
@@ -35,6 +36,7 @@ STAGES: list[tuple[str, str]] = [
     ("plot_irf.py",         "Figures FIG_01, FIG_03, FIG_04, FIG_S1-S3"),
     ("shock_descriptor.py", "Unit-impulse shock figure FIG_02"),
     ("export_tables.py",    "Paper tables -> CSV"),
+    ("diagnostics.py",      "Paper diagnostics -> CSV"),
 ]
 
 STAGE_SEP   = "-" * 64
